@@ -9,26 +9,61 @@ module LogstashPack
     if File.exists? "#{OUTPUT_PATH}/logstash.conf"
       "Logstash"
     else
-      raise Exception
+      raise "logstash.conf is missing!"
     end
   end
 
   def self.compile
-    log "Downloading Logstash #{config[:version]} from #{config[:url]}..."
-    `curl #{config[:url]} -L --silent -o #{OUTPUT_PATH}/logstash.jar`
+    install_logstash
   end
 
   def self.release
-    debug = config[:debug] ? "-vvv" : ""
     {
-      "default_process_types" => {
-        "worker" => "/usr/bin/java -server -Xms384M -Xmx384M -Djava.net.preferIPv4Stack=true -XX:+UseParallelOldGC -jar /app/logstash.jar agent -f /app/logstash.conf #{debug}"
-      }
+      "addons" => default_addons,
+      "default_process_types" => default_process_types
     }.to_yaml
+  end
+
+  def self.default_process_types
+    {
+      "worker"  => "./lib/sockets-connect/rs-conn logstash/bin/logstash agent -f logstash.conf #{'--debug' if config[:debug]}"
+    }
+  end
+
+  def self.default_addons
+    ["searchbox", "ruppells-sockets"]
   end
 
   def self.log(message)
     puts "-----> #{message}"
+  end
+
+  def self.run(command)
+    %x{ #{command} 2>&1 }
+  end
+
+  # run a shell command and stream the ouput
+  # @param [String] command to be run
+  def self.pipe(command)
+    output = ""
+    IO.popen(command) do |io|
+      until io.eof?
+        buffer = io.gets
+        output << buffer
+        puts buffer
+      end
+    end
+
+    output
+  end
+
+  def self.install_logstash
+    log('Installing logstash')
+    log "Downloading Logstash #{config[:version]} from #{config[:url]}..."
+    pipe("curl #{config[:url]} -L -o - | tar xzf -")
+    run("mv #{Dir["logstash-*"][0]} #{OUTPUT_PATH}/logstash")
+    run("cp #{OUTPUT_PATH}/patterns/* #{OUTPUT_PATH}/logstash/patterns")
+    run("./logstash/bin/plugin install contrib")
   end
 
   def self.config
@@ -41,8 +76,8 @@ module LogstashPack
       output[:debug] = config['logstash']['debug'] if config['logstash']['debug']
     end
 
-    output[:version] ||= "1.2.1"
-    output[:url] ||= "https://download.elasticsearch.org/logstash/logstash/logstash-#{output[:version]}-flatjar.jar"
+    output[:version] ||= "1.4.2"
+    output[:url] ||= "https://download.elasticsearch.org/logstash/logstash/logstash-#{output[:version]}.tar.gz"
     output[:debug] ||= false
 
     output
