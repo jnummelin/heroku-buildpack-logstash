@@ -1,12 +1,13 @@
 require 'yaml'
 require 'json'
+require 'erb'
 
 module LogstashPack
 
   OUTPUT_PATH = ARGV[0]
 
   def self.detect
-    if File.exists? "#{OUTPUT_PATH}/logstash.conf"
+    if File.exists?("#{OUTPUT_PATH}/logstash.conf") || File.exists?("#{OUTPUT_PATH}/logstash.conf.erb")
       "Logstash"
     else
       raise "logstash.conf is missing!"
@@ -15,6 +16,7 @@ module LogstashPack
 
   def self.compile
     install_logstash
+    compile_config
   end
 
   def self.release
@@ -63,7 +65,16 @@ module LogstashPack
     pipe("curl #{config[:url]} -L -o - | tar xzf -")
     run("mv #{Dir["logstash-*"][0]} #{OUTPUT_PATH}/logstash")
     run("cp #{OUTPUT_PATH}/patterns/* #{OUTPUT_PATH}/logstash/patterns")
-    run("./logstash/bin/plugin install contrib")
+    run("#{OUTPUT_PATH}/logstash/bin/plugin install contrib")
+  end
+
+  def self.compile_config
+    if File.exists? "#{OUTPUT_PATH}/logstash.conf.erb"
+      log("COMPILING ERB")
+      content = File.read("#{OUTPUT_PATH}/logstash.conf.erb")
+      template = ERB.new(content)
+      File.open("#{OUTPUT_PATH}/logstash.conf", 'w') { |f| f.puts(template.result) }
+    end
   end
 
   def self.config

@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 
 $:.unshift File.expand_path("../../lib", __FILE__)
+require "shell_helpers"
 require "logstash_pack"
 
+ShellHelpers.initialize_env(ARGV[2])
 LogstashPack.compile
