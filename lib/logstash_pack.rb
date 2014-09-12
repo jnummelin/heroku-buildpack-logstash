@@ -68,12 +68,23 @@ module LogstashPack
     run("#{OUTPUT_PATH}/logstash/bin/plugin install contrib")
   end
 
+  def self.compile_erb(path)
+    content = File.read(path)
+    template = ERB.new(content)
+    File.open(path.gsub('.erb', ''), 'w') { |f| f.puts(template.result) }
+  end
+
   def self.compile_config
     if File.exists? "#{OUTPUT_PATH}/logstash.conf.erb"
-      log("COMPILING ERB")
-      content = File.read("#{OUTPUT_PATH}/logstash.conf.erb")
-      template = ERB.new(content)
-      File.open("#{OUTPUT_PATH}/logstash.conf", 'w') { |f| f.puts(template.result) }
+      log("COMPILING logstash.conf.erb")
+      compile_erb("#{OUTPUT_PATH}/logstash.conf.erb")
+    elsif File.directory?("logstash.conf")
+      log("COMPILING *.erb files logstash.conf directory")
+      Dir.entries("#{OUTPUT_PATH}/logstash.conf").select {|f| !File.directory? f}.each do |file_name|
+        if file_name =~ /\.erb$/
+          compile_erb("#{OUTPUT_PATH}/logstash.conf/#{file_name}")
+        end
+      end
     end
   end
 
