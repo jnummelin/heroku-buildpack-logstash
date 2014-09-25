@@ -78,11 +78,12 @@ module LogstashPack
     if File.exists? "#{OUTPUT_PATH}/logstash.conf.erb"
       log("COMPILING logstash.conf.erb")
       compile_erb("#{OUTPUT_PATH}/logstash.conf.erb")
-    elsif File.directory?("logstash.conf")
+    elsif File.directory?("#{OUTPUT_PATH}/logstash.conf")
       log("COMPILING *.erb files logstash.conf directory")
       Dir.entries("#{OUTPUT_PATH}/logstash.conf").select {|f| !File.directory? f}.each do |file_name|
         if file_name =~ /\.erb$/
           compile_erb("#{OUTPUT_PATH}/logstash.conf/#{file_name}")
+          File.delete("#{OUTPUT_PATH}/logstash.conf/#{file_name}")
         end
       end
     end
